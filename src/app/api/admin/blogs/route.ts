@@ -1,4 +1,5 @@
 // src/app/api/admin/blogs/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from "@/lib/mongodb";
 import Blog from '@/models/Blog';
@@ -13,12 +14,17 @@ export async function GET(req: NextRequest) {
 
     await connectDB();
     
-    // Get all blogs (optionally filter by author in a real application)
-    // const blogs = await Blog.find({ author: session.user.id })
-    const blogs = await Blog.find()
-      .sort({ createdAt: -1 }) // Newest first
-      .select('_id title slug excerpt published publishedAt createdAt'); // Only select needed fields
+    // Using req.url to demonstrate usage of the request parameter
+    const url = new URL(req.url);
+    const searchParams = url.searchParams;
+    const publishedOnly = searchParams.get('published') === 'true';
     
+    const query = publishedOnly ? { published: true } : {};
+    
+    const blogs = await Blog.find(query)
+      .sort({ createdAt: -1 })
+      .select('_id title slug excerpt published publishedAt createdAt');
+
     return NextResponse.json(blogs);
   } catch (error) {
     console.error('Error fetching blogs:', error);
@@ -38,6 +44,13 @@ export async function POST(req: NextRequest) {
 
     await connectDB();
     const body = await req.json();
+    
+    if (!body.title || !body.slug) {
+      return NextResponse.json(
+        { error: 'Title and slug are required' },
+        { status: 400 }
+      );
+    }
     
     const blog = new Blog({
       ...body,

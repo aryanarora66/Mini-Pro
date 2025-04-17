@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 
 import dynamic from 'next/dynamic';
 import slugify from 'slugify';
-import { FaSpinner, FaUpload, FaExclamationTriangle, FaCheck, FaTimes, FaImage, FaNewspaper } from 'react-icons/fa';
+import { FaSpinner, FaExclamationTriangle, FaCheck, FaImage, FaNewspaper } from 'react-icons/fa';
 import { useImageUpload } from '@/app/hooks/useImageUpload';
 
 // Lazy load the rich text editor
@@ -281,7 +281,7 @@ export default function CreateBlog() {
                 {imagePreview || formData.coverImage ? (
                   <div className="space-y-3 text-center">
                     <div className="h-40 mx-auto overflow-hidden rounded">
-                      <img 
+                      <img
                         src={imagePreview || formData.coverImage} 
                         alt="Cover preview" 
                         className="h-full w-auto object-cover mx-auto"

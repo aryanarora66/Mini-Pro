@@ -1,8 +1,12 @@
-// src/app/api/auth/route.ts
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+import ImageKit from "imagekit";
 import { getSession } from '@/lib/auth';
-// import * as ImageKit from "imagekitio-next";
-import ImageKit from 'imagekit';
+
+const imagekit = new ImageKit({
+  publicKey: process.env.NEXT_PUBLIC_PUBLIC_KEY!,
+  privateKey: process.env.IMAGEKIT_PRIVATE_KEY!,
+  urlEndpoint: process.env.NEXT_PUBLIC_URL_ENDPOINT!,
+});
 
 export async function GET() {
   try {
@@ -14,18 +18,15 @@ export async function GET() {
       );
     }
 
-    const imagekit = new ImageKit({
-      publicKey: process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY || '',
-      privateKey: process.env.IMAGEKIT_PRIVATE_KEY || '',
-      urlEndpoint: process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT || '',
-    });
-
-    const authParams = imagekit.getAuthenticationParameters();
-    return NextResponse.json(authParams);
+    const authenticationParameters = imagekit.getAuthenticationParameters();
+    return NextResponse.json(authenticationParameters);
   } catch (error) {
+    console.error("ImageKit authentication error:", error);
     return NextResponse.json(
-      { error: 'Failed to generate auth parameters' },
-      { status: 500 }
+      { error: "Authentication failed" },
+      {
+        status: 500,
+      }
     );
   }
 }

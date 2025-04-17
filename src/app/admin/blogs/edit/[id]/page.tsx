@@ -1,9 +1,9 @@
-// src/app/admin/blogs/edit/[id]/page.tsx
 "use client";
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { FaArrowLeft, FaSpinner, FaExclamationTriangle, FaCheck, FaCalendarAlt, FaNewspaper, FaImage } from 'react-icons/fa';
 import { useImageUpload } from '@/app/hooks/useImageUpload';
 
@@ -49,53 +49,50 @@ export default function EditBlog({ params }: { params: { id: string } }) {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const { uploadImage, isUploading, progress } = useImageUpload();
 
-  // Fetch blog data when component mounts
-  useEffect(() => {
-    const fetchBlog = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
+  // Check if form has changes
+  const hasChanges = () => {
+    if (!originalData) return false;
+    return JSON.stringify(formData) !== JSON.stringify(originalData);
+  };
 
-        console.log(`Fetching blog with ID: ${blogId}`);
-        
-        const response = await fetch(`/api/admin/blogs/${blogId}`);
-        console.log('Fetch response status:', response.status);
-        
-        if (!response.ok) {
-          if (response.status === 401) {
-            router.push('/admin/login');
-            return;
-          }
-          if (response.status === 404) {
-            throw new Error('Blog post not found');
-          }
-          throw new Error(`Error ${response.status}: ${response.statusText}`);
+  const fetchBlog = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await fetch(`/api/admin/blogs/${blogId}`);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          router.push('/admin/login');
+          return;
         }
-        
-        // Parse response to get blog data
-        const blog = await response.json();
-        console.log('Blog data retrieved:', blog);
-        
-        // Format data for the form
-        const formattedBlog = {
-          ...blog,
-          tags: Array.isArray(blog.tags) ? blog.tags.join(', ') : ''
-        };
-        
-        setFormData(formattedBlog);
-        setOriginalData(formattedBlog);
-      } catch (err) {
-        console.error('Error fetching blog:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load blog data');
-      } finally {
-        setIsLoading(false);
+        if (response.status === 404) {
+          throw new Error('Blog post not found');
+        }
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
-    };
 
+      const blog = await response.json();
+      const formattedBlog = {
+        ...blog,
+        tags: Array.isArray(blog.tags) ? blog.tags.join(', ') : '',
+      };
+
+      setFormData(formattedBlog);
+      setOriginalData(formattedBlog);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load blog data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     if (blogId) {
       fetchBlog();
     }
-  }, [blogId, router]);
+  }, [blogId, router, setError]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -104,7 +101,6 @@ export default function EditBlog({ params }: { params: { id: string } }) {
       [name]: value
     }));
     
-    // Clear validation error
     if (validationErrors[name]) {
       setValidationErrors(prev => {
         const newErrors = { ...prev };
@@ -117,7 +113,6 @@ export default function EditBlog({ params }: { params: { id: string } }) {
   const handleContentChange = (content: string) => {
     setFormData(prev => ({ ...prev, content }));
     
-    // Clear validation error
     if (validationErrors.content) {
       setValidationErrors(prev => {
         const newErrors = { ...prev };
@@ -135,7 +130,6 @@ export default function EditBlog({ params }: { params: { id: string } }) {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate image file
       if (!file.type.startsWith('image/')) {
         setValidationErrors(prev => ({
           ...prev,
@@ -144,7 +138,7 @@ export default function EditBlog({ params }: { params: { id: string } }) {
         return;
       }
 
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      if (file.size > 5 * 1024 * 1024) {
         setValidationErrors(prev => ({
           ...prev,
           coverImage: 'Image size must be less than 5MB'
@@ -154,14 +148,12 @@ export default function EditBlog({ params }: { params: { id: string } }) {
 
       setImageFile(file);
       
-      // Create preview
       const reader = new FileReader();
       reader.onload = () => {
         setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
 
-      // Clear validation errors
       setValidationErrors(prev => {
         const newErrors = { ...prev };
         delete newErrors.coverImage;
@@ -196,48 +188,35 @@ export default function EditBlog({ params }: { params: { id: string } }) {
     setSuccess(null);
 
     try {
-      console.log(`Updating blog with ID: ${blogId}`);
-
-      // Upload new image if selected
       let coverImageUrl = formData.coverImage;
       if (imageFile) {
         try {
-          console.log('Uploading new image...');
           const url = await uploadImage(imageFile);
           coverImageUrl = url;
-          console.log('Image uploaded successfully:', url);
         } catch (uploadError) {
-          console.error('Image upload error:', uploadError);
           throw new Error('Failed to upload image: ' + (uploadError instanceof Error ? uploadError.message : 'Unknown error'));
         }
       }
 
-      // Extract tags from string
       const tags = formData.tags
         .split(',')
         .map(tag => tag.trim())
         .filter(Boolean);
 
-      // Prepare data for API
       const updateData = {
         ...formData,
         coverImage: coverImageUrl,
         tags
       };
 
-      console.log('Sending update data:', updateData);
-
-      // Update blog with all data
       const response = await fetch(`/api/admin/blogs/${blogId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(updateData),
-        credentials: 'include', // Important for authentication cookies
+        credentials: 'include',
       });
-
-      console.log('Update response status:', response.status);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -245,20 +224,21 @@ export default function EditBlog({ params }: { params: { id: string } }) {
       }
 
       const updatedBlog = await response.json();
-      console.log('Blog updated successfully:', updatedBlog);
-
       setSuccess('Blog post updated successfully!');
       
-      // Update form data with the response
       setFormData({
         ...updatedBlog,
         tags: Array.isArray(updatedBlog.tags) ? updatedBlog.tags.join(', ') : ''
       });
       
-      // Smooth scroll to top to show success message
+      // Update original data after successful save
+      setOriginalData({
+        ...updatedBlog,
+        tags: Array.isArray(updatedBlog.tags) ? updatedBlog.tags.join(', ') : ''
+      });
+
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
-      console.error('Blog update error:', err);
       setError(err instanceof Error ? err.message : 'Failed to update blog');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
@@ -406,10 +386,13 @@ export default function EditBlog({ params }: { params: { id: string } }) {
               
               {(formData.coverImage || imagePreview) && (
                 <div className="mb-3 relative">
-                  <img 
+                  <Image 
                     src={imagePreview || formData.coverImage}
                     alt="Cover" 
-                    className="h-40 object-cover rounded"
+                    width={800}
+                    height={400}
+                    className="h-40 w-full object-cover rounded"
+                    priority={false}
                   />
                 </div>
               )}
@@ -545,7 +528,7 @@ export default function EditBlog({ params }: { params: { id: string } }) {
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || isUploading}
+                disabled={isSubmitting || isUploading || !hasChanges()}
                 className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
