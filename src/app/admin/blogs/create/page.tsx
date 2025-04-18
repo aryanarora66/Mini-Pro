@@ -3,11 +3,11 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-
 import dynamic from 'next/dynamic';
 import slugify from 'slugify';
 import { FaSpinner, FaExclamationTriangle, FaCheck, FaImage, FaNewspaper } from 'react-icons/fa';
 import { useImageUpload } from '@/app/hooks/useImageUpload';
+import Image from 'next/image'; // <--- Added Import
 
 // Lazy load the rich text editor
 const RichTextEditor = dynamic(
@@ -22,12 +22,12 @@ export default function CreateBlog() {
     slug: '',
     content: '',
     excerpt: '',
-    coverImage: '',
+    coverImage: '', // This might hold the final URL after upload
     tags: '',
     published: false
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null); // This holds the data: URL for preview
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -48,7 +48,7 @@ export default function CreateBlog() {
       ...prev,
       [name]: value
     }));
-    
+
     // Clear validation error when user types
     if (validationErrors[name]) {
       setValidationErrors(prev => {
@@ -61,7 +61,7 @@ export default function CreateBlog() {
 
   const handleContentChange = (content: string) => {
     setFormData(prev => ({ ...prev, content }));
-    
+
     // Clear validation error
     if (validationErrors.content) {
       setValidationErrors(prev => {
@@ -86,6 +86,8 @@ export default function CreateBlog() {
           ...prev,
           coverImage: 'Please select an image file'
         }));
+        setImageFile(null); // Clear invalid file
+        setImagePreview(null); // Clear preview
         return;
       }
 
@@ -94,6 +96,8 @@ export default function CreateBlog() {
           ...prev,
           coverImage: 'Image size must be less than 5MB'
         }));
+        setImageFile(null); // Clear invalid file
+        setImagePreview(null); // Clear preview
         return;
       }
 
@@ -115,11 +119,12 @@ export default function CreateBlog() {
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
-    
+
     if (!formData.title.trim()) errors.title = 'Title is required';
     if (!formData.slug.trim()) errors.slug = 'Slug is required';
     if (!formData.content.trim()) errors.content = 'Content is required';
     if (!formData.excerpt.trim()) errors.excerpt = 'Excerpt is required';
+    // Require either an existing image URL or a new file selected
     if (!imageFile && !formData.coverImage) errors.coverImage = 'Cover image is required';
 
     setValidationErrors(errors);
@@ -128,7 +133,7 @@ export default function CreateBlog() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
 
     setIsSubmitting(true);
@@ -136,8 +141,8 @@ export default function CreateBlog() {
     setSuccess('');
 
     try {
-      // Upload image if selected
-      let coverImageUrl = formData.coverImage;
+      // Upload image if a new one was selected
+      let coverImageUrl = formData.coverImage; // Keep existing if no new file
       if (imageFile) {
         try {
           const url = await uploadImage(imageFile);
@@ -145,6 +150,11 @@ export default function CreateBlog() {
         } catch (uploadError) {
           throw new Error('Failed to upload image: ' + (uploadError instanceof Error ? uploadError.message : 'Unknown error'));
         }
+      }
+
+      // Ensure we have a final cover image URL before submitting
+      if (!coverImageUrl) {
+           throw new Error('Cover image is missing after potential upload attempt.');
       }
 
       // Create blog with all data
@@ -155,7 +165,7 @@ export default function CreateBlog() {
         },
         body: JSON.stringify({
           ...formData,
-          coverImage: coverImageUrl,
+          coverImage: coverImageUrl, // Use the final URL
           tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
         }),
       });
@@ -166,7 +176,7 @@ export default function CreateBlog() {
       }
 
       setSuccess('Blog post created successfully!');
-      
+
       // Redirect after a brief delay to show success message
       setTimeout(() => {
         router.push('/admin/blogs');
@@ -259,6 +269,7 @@ export default function CreateBlog() {
                   }`}
                   placeholder="your-blog-post-url"
                   disabled={isSubmitting}
+                  readOnly // Slug is auto-generated, make read-only or disable direct input
                 />
                 {validationErrors.slug && (
                   <p className="mt-1 text-sm text-red-600">{validationErrors.slug}</p>
@@ -274,52 +285,60 @@ export default function CreateBlog() {
               <label className="block text-sm font-medium text-gray-700">
                 Cover Image *
               </label>
-              
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md 
-                         hover:bg-gray-50 transition-colors duration-200
-                         ${validationErrors.coverImage ? 'border-red-300' : 'border-gray-300'}">
+
+              <div className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md
+                               hover:bg-gray-50 transition-colors duration-200
+                               ${validationErrors.coverImage ? 'border-red-300' : 'border-gray-300'}`}>
+                {/* Check if there's a preview OR an existing image URL */}
                 {imagePreview || formData.coverImage ? (
-                  <div className="space-y-3 text-center">
-                    <div className="h-40 mx-auto overflow-hidden rounded">
-                      <img
-                        src={imagePreview || formData.coverImage} 
-                        alt="Cover preview" 
-                        className="h-full w-auto object-cover mx-auto"
+                  <div className="space-y-3 text-center w-full"> {/* Ensure this container takes width */}
+                    {/* Parent Div for Next/Image */}
+                    <div className="relative h-40 w-full max-w-md mx-auto overflow-hidden rounded">
+                      <Image // <<< Using Next/Image Component
+                        src={imagePreview || formData.coverImage} // Source can be preview (data URL) or final URL
+                        alt="Cover preview"
+                        layout="fill"                            // Fill the container
+                        objectFit="cover"                       // Cover the area, maintain aspect ratio
+                        unoptimized={imagePreview?.startsWith('data:')} // Don't optimize data URLs
                       />
                     </div>
                     <div className="flex items-center justify-center text-sm">
                       <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500">
                         <span>Change image</span>
-                        <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleImageChange} disabled={isSubmitting || isUploading} />
+                        <input id="file-upload" name="file-upload" type="file" accept="image/*" className="sr-only" onChange={handleImageChange} disabled={isSubmitting || isUploading} />
                       </label>
+                       <button type="button" onClick={() => { setImagePreview(null); setImageFile(null); setFormData(prev => ({...prev, coverImage: ''})) }} className="ml-3 text-sm text-red-600 hover:text-red-800" disabled={isSubmitting || isUploading}>
+                           Remove
+                       </button>
                     </div>
                   </div>
                 ) : (
+                  // Placeholder when no image is selected or available
                   <div className="space-y-1 text-center">
                     <FaImage className="mx-auto h-12 w-12 text-gray-400" />
-                    <div className="flex text-sm text-gray-600">
+                    <div className="flex text-sm text-gray-600 justify-center">
                       <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500">
                         <span>Upload a file</span>
-                        <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleImageChange} disabled={isSubmitting || isUploading} />
+                        <input id="file-upload" name="file-upload" type="file" accept="image/*" className="sr-only" onChange={handleImageChange} disabled={isSubmitting || isUploading} />
                       </label>
-                      <p className="pl-1">or drag and drop</p>
+                      {/* <p className="pl-1">or drag and drop</p>  // Drag and drop needs extra implementation */}
                     </div>
                     <p className="text-xs text-gray-500">
-                      PNG, JPG, GIF up to 5MB
+                      PNG, JPG, GIF, WEBP up to 5MB
                     </p>
                   </div>
                 )}
               </div>
-              
+
               {isUploading && (
                 <div className="mt-2">
-                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
                     <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
                   </div>
                   <p className="mt-1 text-xs text-gray-500 text-center">{progress}% Uploaded</p>
                 </div>
               )}
-              
+
               {validationErrors.coverImage && (
                 <p className="mt-1 text-sm text-red-600">{validationErrors.coverImage}</p>
               )}
@@ -350,7 +369,7 @@ export default function CreateBlog() {
               )}
             </div>
 
-            {/* Tags */}
+             {/* Tags */}
             <div>
               <label htmlFor="tags" className="block text-sm font-medium text-gray-700">
                 Tags (comma separated)
@@ -372,17 +391,19 @@ export default function CreateBlog() {
 
             {/* Content / Rich Text Editor */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Content *
-              </label>
-              <RichTextEditor
-                value={formData.content}
-                onChange={handleContentChange}
-                className={`${validationErrors.content ? 'border-red-300' : ''}`}
-              />
-              {validationErrors.content && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.content}</p>
-              )}
+               <label className="block text-sm font-medium text-gray-700 mb-1">
+                 Content *
+               </label>
+               <div className={validationErrors.content ? 'border border-red-300 rounded-md' : ''}>
+                 <RichTextEditor
+                   value={formData.content}
+                   onChange={handleContentChange}
+                  // className is applied inside the component usually, wrapping helps highlight error
+                 />
+               </div>
+               {validationErrors.content && (
+                 <p className="mt-1 text-sm text-red-600">{validationErrors.content}</p>
+               )}
             </div>
 
             {/* Published Status */}
@@ -404,11 +425,12 @@ export default function CreateBlog() {
               </p>
             </div>
 
+
             {/* Action Buttons */}
             <div className="flex justify-end pt-5 border-t border-gray-200">
               <button
                 type="button"
-                onClick={() => router.push('/admin/blogs')}
+                onClick={() => router.back()} // Go back instead of fixed route?
                 className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mr-3"
                 disabled={isSubmitting}
               >
