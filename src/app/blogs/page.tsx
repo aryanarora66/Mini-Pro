@@ -1,4 +1,5 @@
 // src/app/blogs/page.tsx
+import Image from 'next/image';
 import Link from 'next/link';
 import { FaClock, FaTags } from 'react-icons/fa';
 
@@ -60,8 +61,10 @@ export default async function BlogList() {
                 className="group bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300"
               >
                 <div className="h-56 overflow-hidden">
-                  <img 
+                  <Image 
                     src={blog.coverImage} 
+                    width={500}
+                    height={500}
                     alt={blog.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />

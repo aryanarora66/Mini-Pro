@@ -2,6 +2,7 @@
 import { FaClock, FaTags, FaUser } from 'react-icons/fa';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import Image from 'next/image'; // lib add 
 
 interface BlogPost {
   _id: string;
@@ -13,7 +14,7 @@ interface BlogPost {
   tags?: string[];
 }
 
-async function getBlog(slug: string) {
+async function getBlog(slug:string) {
   // Use absolute URL with the current origin - this resolves the URL issue
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
                  (process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '');
@@ -38,14 +39,15 @@ async function getBlog(slug: string) {
   }
 }
 
-export default async function BlogDetail({ params }: { params: { slug: string } }) {
+export default async function BlogDetail({ params }: { params: Promise<{ slug: string }> }) {
   // Make sure params.slug is a string
-  const slug = params.slug;
+  const resolvedParams = await params;
+  const slug = resolvedParams.slug;
   if (typeof slug !== 'string') {
     notFound();
   }
   
-  const blog: BlogPost | null = await getBlog(slug);
+  const blog: BlogPost | null = await getBlog(slug); /// promise convert
   
   if (!blog) {
     notFound();
@@ -56,7 +58,7 @@ export default async function BlogDetail({ params }: { params: { slug: string } 
       <div className="max-w-4xl mx-auto">
         {/* Featured Image */}
         <div className="rounded-2xl overflow-hidden mb-8 h-80 md:h-96">
-          <img 
+          <Image 
             src={blog.coverImage} 
             alt={blog.title} 
             className="w-full h-full object-cover"

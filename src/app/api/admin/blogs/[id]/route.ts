@@ -5,8 +5,8 @@ import Blog from '@/models/Blog';
 import { getSession } from '@/lib/auth';
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest, // [id] -> dynamic , promise 
+  { params }: { params: Promise<{ id: string }> } // id -> blog , // ssr , params -> promise , async (resolve , reject , pending)
 ) {
   try {
     const session = await getSession();
@@ -15,9 +15,10 @@ export async function GET(
     }
 
     await connectDB();
+    const resolvedParams = await params; 
     
     // Properly handle the id parameter
-    const blogId = params.id;
+    const blogId = resolvedParams.id;
     
     // Remove author restriction to simplify debugging
     const blog = await Blog.findById(blogId);
@@ -38,7 +39,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // static (hardcode )
 ) {
   try {
     const session = await getSession();
@@ -47,9 +48,11 @@ export async function PUT(
     }
 
     await connectDB();
+
+    const resolvedPromise = await params; // 'await' has no effect on the type of this expression.ts(80007)
     
     // Properly handle the id parameter
-    const blogId = params.id;
+    const blogId = resolvedPromise.id;
     const body = await request.json();
     
     // Remove author restriction to simplify debugging
@@ -75,7 +78,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession();
@@ -84,9 +87,9 @@ export async function DELETE(
     }
 
     await connectDB();
-    
+    const resolvedParams = await params;
     // Properly handle the id parameter
-    const blogId = params.id;
+    const blogId = resolvedParams.id;
     
     // Remove author restriction to simplify debugging
     const blog = await Blog.findByIdAndDelete(blogId);
